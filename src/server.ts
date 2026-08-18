@@ -163,7 +163,7 @@ const server = http.createServer(async (req, res) => {
 const problemas = validateConfig();
 const store = iniciarStore();
 
-server.listen(config.port, () => {
+server.listen(config.port, '0.0.0.0', () => {
   log('info', 'servidor no ar', {
     porta: config.port,
     urlPublica: config.publicUrl || '(não configurada)',
