@@ -67,3 +67,19 @@ node dist/server.js
 Se a assinatura for rejeitada, o log mostra o formato recebido (chaves da query
 e headers) sem aceitar a requisição. Ajuste e mantenha
 `KIWIFY_STRICT_SIGNATURE=true`.
+
+## Armadilhas já encontradas neste deploy
+
+**`NODE_ENV=production` antes do `npm install`.** O npm pula as devDependencies,
+o TypeScript não é instalado e o build quebra. A variável só entra depois de
+compilar — ver comentário no `Dockerfile`.
+
+**Variáveis de ambiente gravadas em uma linha só.** Ao enviar o bloco de env
+pela API do EasyPanel, as quebras precisam ser `\n` reais. Se virar uma linha
+única, `PORT` recebe o resto do bloco junto, `Number()` devolve `NaN`, o Node
+escuta numa porta aleatória e o proxy responde 502 para sempre — sem nenhum
+erro visível. Confira com `inspectService` que o número de linhas bate.
+
+**`dist/boot.js` é o entrypoint, não `server.js`.** Se a inicialização falhar,
+ele sobe um servidor mínimo que devolve o erro e o stack em `/health` com status
+500 — diagnóstico sem precisar de acesso ao painel.
