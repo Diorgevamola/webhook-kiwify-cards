@@ -1,0 +1,24 @@
+{
+  "name": "webhook-kiwify-cards-seguranca",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Recebe webhook da Kiwify e entrega o produto por e-mail",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "tsc --watch"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "nodemailer": "^6.9.14"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "@types/nodemailer": "^6.4.15",
+    "typescript": "^5.5.3"
+  }
+}
