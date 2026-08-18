@@ -17,4 +17,4 @@ ENV NODE_ENV=production
 ENV PORT=3000
 RUN mkdir -p /data
 EXPOSE 3000
-CMD ["node", "dist/server.js"]
+CMD ["node", "dist/boot.js"]
