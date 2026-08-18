@@ -1,7 +1,15 @@
-# TESTE DE DIAGNOSTICO: imagem minima, sem npm, sem build.
-# Se subir -> o problema estava no build. Se der 502 -> o problema e roteamento/porta.
 FROM node:22-alpine
 WORKDIR /app
-RUN printf 'require("http").createServer((q,s)=>{s.writeHead(200,{"Content-Type":"application/json"});s.end(JSON.stringify({diagnostico:"ok",porta:3000}))}).listen(3000,"0.0.0.0",()=>console.log("teste no ar na 3000"))' > t.cjs
+ENV NODE_ENV=production
+ENV PORT=3000
+
+COPY package.json package-lock.json tsconfig.json ./
+# instala tudo (inclusive dev) para poder compilar o TypeScript
+RUN npm install --no-audit --no-fund
+
+COPY src ./src
+RUN npx tsc && npm prune --omit=dev && npm cache clean --force
+
+RUN mkdir -p /data
 EXPOSE 3000
-CMD ["node","t.cjs"]
+CMD ["node", "dist/server.js"]
