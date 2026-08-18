@@ -6,6 +6,14 @@ import { iniciarStore, foiEntregue, registrarEntrega, totalEntregas } from './st
 
 const MAX_BODY = 1_000_000; // 1 MB: webhook legítimo é muito menor
 
+/**
+ * Metadados do último webhook recebido. Serve para diagnosticar de fora — sem
+ * acesso ao log do painel — se a Kiwify está chamando e em que formato ela
+ * assina. Guarda só o formato, nunca o conteúdo: sem e-mail, sem nome e sem a
+ * assinatura inteira.
+ */
+let ultimoRecebido: Record<string, unknown> | null = null;
+
 function log(nivel: 'info' | 'warn' | 'error', msg: string, dados: Record<string, unknown> = {}) {
   console[nivel === 'error' ? 'error' : 'log'](
     JSON.stringify({ ts: new Date().toISOString(), nivel, msg, ...dados })
@@ -110,6 +118,18 @@ const server = http.createServer(async (req, res) => {
     return json(res, 200, { ok: true, entregas: totalEntregas() });
   }
 
+  if (rota === '/debug/ultimo' && req.method === 'GET') {
+    return json(res, 200, {
+      ultimoRecebido,
+      assinaturaEstrita: config.kiwify.strictSignature,
+      tokenConfigurado: !!config.kiwify.webhookToken,
+      produtoFiltrado: config.kiwify.productId || null,
+      smtpConfigurado: !!config.smtp.host,
+      entregaConfigurada: !!config.delivery.url,
+      entregas: totalEntregas(),
+    });
+  }
+
   if (rota === '/' && req.method === 'GET') {
     return json(res, 200, {
       servico: 'webhook-kiwify · 300 Cards de Segurança Familiar',
@@ -132,6 +152,20 @@ const server = http.createServer(async (req, res) => {
     }
 
     const check = verifySignature(rawBody, url, req.headers);
+
+    ultimoRecebido = {
+      quando: new Date().toISOString(),
+      assinaturaValida: check.valid,
+      algoritmo: check.algorithm,
+      motivo: check.reason ?? null,
+      assinaturaPresente: !!check.received,
+      assinaturaTamanho: check.received?.length ?? 0,
+      chavesDaQuery: [...url.searchParams.keys()],
+      headersRelevantes: Object.keys(req.headers).filter((h) =>
+        h.includes('kiwify') || h.includes('signature') || h.includes('hash')
+      ),
+      corpoBytes: rawBody.length,
+    };
 
     if (!check.valid) {
       // Loga o formato recebido para descobrir o esquema real da Kiwify
