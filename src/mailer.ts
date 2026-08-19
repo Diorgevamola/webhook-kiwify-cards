@@ -29,7 +29,9 @@ export async function verificarSmtp(): Promise<{ ok: boolean; erro?: string }> {
   }
 }
 
-export async function enviarEntrega(compra: Compra): Promise<{ messageId: string }> {
+export async function enviarEntrega(
+  compra: Compra
+): Promise<{ messageId: string; aceitos: string[]; resposta: string }> {
   const { assunto, html, texto } = montarEmail(compra);
 
   const info = await getTransporter().sendMail({
@@ -42,5 +44,19 @@ export async function enviarEntrega(compra: Compra): Promise<{ messageId: string
     html,
   });
 
-  return { messageId: info.messageId };
+  /**
+   * `sendMail` resolver não significa que o e-mail saiu: o servidor pode
+   * aceitar a conexão e recusar o destinatário. Nesse caso `rejected` vem
+   * preenchido e `accepted` vazio — e sem esta checagem a entrega seria
+   * marcada como concluída com o comprador sem receber nada.
+   */
+  const aceitos = (info.accepted ?? []).map(String);
+  const rejeitados = (info.rejected ?? []).map(String);
+  if (!aceitos.length) {
+    throw new Error(
+      `servidor SMTP nao aceitou nenhum destinatario (rejeitados: ${rejeitados.join(', ') || 'nenhum listado'}) — resposta: ${info.response ?? 'sem resposta'}`
+    );
+  }
+
+  return { messageId: info.messageId, aceitos, resposta: String(info.response ?? '') };
 }

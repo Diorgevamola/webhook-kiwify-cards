@@ -14,6 +14,13 @@ const MAX_BODY = 1_000_000; // 1 MB: webhook legítimo é muito menor
  */
 let ultimoRecebido: Record<string, unknown> | null = null;
 
+/**
+ * Resultado do último envio, com a resposta crua do servidor SMTP. Sem isso,
+ * "entregas: 1" no /health não distingue e-mail que chegou de e-mail que o
+ * servidor aceitou e descartou depois.
+ */
+let ultimoEnvio: Record<string, unknown> | null = null;
+
 function log(nivel: 'info' | 'warn' | 'error', msg: string, dados: Record<string, unknown> = {}) {
   console[nivel === 'error' ? 'error' : 'log'](
     JSON.stringify({ ts: new Date().toISOString(), nivel, msg, ...dados })
@@ -95,7 +102,7 @@ async function processar(rawBody: Buffer) {
   }
 
   try {
-    const { messageId } = await enviarEntrega(compra);
+    const { messageId, aceitos, resposta } = await enviarEntrega(compra);
     registrarEntrega({
       orderId: compra.orderId,
       email: compra.email,
@@ -104,13 +111,16 @@ async function processar(rawBody: Buffer) {
       enviadoEm: new Date().toISOString(),
       messageId,
     });
+    ultimoEnvio = { quando: new Date().toISOString(), ok: true, aceitos: aceitos.length, resposta };
     log('info', 'produto entregue por e-mail', {
-      orderId: compra.orderId, email: compra.email, messageId, totalEntregas: totalEntregas(),
+      orderId: compra.orderId, email: compra.email, messageId,
+      aceitos, resposta, totalEntregas: totalEntregas(),
     });
   } catch (err) {
     // Não registra como entregue e libera a reserva: assim um retry da
     // AbacatePay tenta de novo em vez de esbarrar num envio "em andamento".
     liberar(compra.orderId);
+    ultimoEnvio = { quando: new Date().toISOString(), ok: false, erro: (err as Error).message };
     log('error', 'FALHA AO ENVIAR — comprador ficou sem o produto', {
       orderId: compra.orderId, email: compra.email, erro: (err as Error).message,
     });
@@ -128,6 +138,7 @@ const server = http.createServer(async (req, res) => {
   if (rota === '/debug/ultimo' && req.method === 'GET') {
     return json(res, 200, {
       ultimoRecebido,
+      ultimoEnvio,
       assinaturaEstrita: config.abacate.strictSignature,
       secretConfigurado: !!config.abacate.webhookSecret,
       produtoFiltrado: config.abacate.productId || null,
