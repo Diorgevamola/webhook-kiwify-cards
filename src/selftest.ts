@@ -10,7 +10,7 @@ process.env.ABACATEPAY_WEBHOOK_SECRET ||= SECRET;
 process.env.DATA_DIR ||= './.tmp-selftest';
 
 const { verifySignature, parseCompra, emailValido } = await import('./abacatepay.js');
-const { iniciarStore, foiEntregue, registrarEntrega } = await import('./store.js');
+const { iniciarStore, foiEntregue, reservar, liberar, registrarEntrega } = await import('./store.js');
 
 let passou = 0, falhou = 0;
 function check(nome: string, cond: boolean, extra = '') {
@@ -110,6 +110,16 @@ console.log('\n== idempotência ==');
   check('pedido novo ainda não entregue', !foiEntregue(id));
   registrarEntrega({ orderId: id, email: 'a@b.com', nome: 'A', produtoId: 'P', enviadoEm: new Date().toISOString() });
   check('pedido marcado após entrega', foiEntregue(id));
+}
+{
+  // Dois webhooks do mesmo pedido chegando antes de o SMTP responder.
+  const id = `bill_corrida_${Date.now()}`;
+  check('primeiro envio reserva o pedido', reservar(id));
+  check('segundo envio simultâneo é barrado', !reservar(id));
+  liberar(id);
+  check('falha no envio libera para o retry', reservar(id));
+  registrarEntrega({ orderId: id, email: 'a@b.com', nome: 'A', produtoId: 'P', enviadoEm: new Date().toISOString() });
+  check('entrega concluída encerra a reserva', foiEntregue(id) && reservar(id));
 }
 
 console.log(`\n${passou} passaram, ${falhou} falharam\n`);

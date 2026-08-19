@@ -59,8 +59,32 @@ export function foiEntregue(orderId: string): boolean {
   return jaEntregue.has(orderId);
 }
 
+/**
+ * Pedidos com envio em andamento. `foiEntregue` só passa a valer depois que o
+ * SMTP responde, e nesse intervalo cabe um segundo webhook do mesmo pedido —
+ * um retry rápido, ou dois webhooks cadastrados para o mesmo evento. Ambos
+ * passariam na checagem e o comprador levaria o e-mail duas vezes.
+ *
+ * `reservar` fecha essa janela: só o primeiro a chegar segue adiante. Como o
+ * Node roda um evento por vez, o par ver-e-marcar aqui é atômico na prática.
+ */
+const emVoo = new Set<string>();
+
+/** Retorna false se outro envio do mesmo pedido já está em andamento. */
+export function reservar(orderId: string): boolean {
+  if (emVoo.has(orderId)) return false;
+  emVoo.add(orderId);
+  return true;
+}
+
+/** Libera a reserva — chamar quando o envio falha, para o retry poder tentar. */
+export function liberar(orderId: string): void {
+  emVoo.delete(orderId);
+}
+
 export function registrarEntrega(e: Entrega): void {
   jaEntregue.add(e.orderId);
+  emVoo.delete(e.orderId);
   if (!persistenciaOk) return;
   try {
     fs.appendFileSync(ARQUIVO, JSON.stringify(e) + '\n', 'utf8');

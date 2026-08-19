@@ -2,7 +2,7 @@ import http from 'node:http';
 import { config, validateConfig } from './config.js';
 import { verifySignature, parseCompra, emailValido } from './abacatepay.js';
 import { enviarEntrega, verificarSmtp } from './mailer.js';
-import { iniciarStore, foiEntregue, registrarEntrega, totalEntregas } from './store.js';
+import { iniciarStore, foiEntregue, reservar, liberar, registrarEntrega, totalEntregas } from './store.js';
 
 const MAX_BODY = 1_000_000; // 1 MB: webhook legítimo é muito menor
 
@@ -89,6 +89,11 @@ async function processar(rawBody: Buffer) {
     return;
   }
 
+  if (!reservar(compra.orderId)) {
+    log('info', 'envio deste pedido já em andamento, ignorando', { orderId: compra.orderId });
+    return;
+  }
+
   try {
     const { messageId } = await enviarEntrega(compra);
     registrarEntrega({
@@ -103,7 +108,9 @@ async function processar(rawBody: Buffer) {
       orderId: compra.orderId, email: compra.email, messageId, totalEntregas: totalEntregas(),
     });
   } catch (err) {
-    // Não registra como entregue: assim um retry da AbacatePay tenta de novo.
+    // Não registra como entregue e libera a reserva: assim um retry da
+    // AbacatePay tenta de novo em vez de esbarrar num envio "em andamento".
+    liberar(compra.orderId);
     log('error', 'FALHA AO ENVIAR — comprador ficou sem o produto', {
       orderId: compra.orderId, email: compra.email, erro: (err as Error).message,
     });

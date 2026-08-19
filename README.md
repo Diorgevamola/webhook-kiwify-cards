@@ -82,7 +82,7 @@ redeploy zera o registro e um retry antigo pode reenviar e-mail.
 ```bash
 npm install
 npm run build
-node dist/selftest.js   # 24 testes de verificação, parse e idempotência
+node dist/selftest.js   # 28 testes de verificação, parse e idempotência
 node dist/server.js
 ```
 
