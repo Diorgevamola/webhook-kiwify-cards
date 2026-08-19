@@ -1,7 +1,7 @@
 import nodemailer, { type Transporter } from 'nodemailer';
 import { config } from './config.js';
 import { montarEmail } from './template.js';
-import type { Compra } from './kiwify.js';
+import type { Compra } from './abacatepay.js';
 
 let transporter: Transporter | null = null;
 

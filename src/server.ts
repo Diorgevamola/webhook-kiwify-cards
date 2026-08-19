@@ -1,6 +1,6 @@
 import http from 'node:http';
 import { config, validateConfig } from './config.js';
-import { verifySignature, parseCompra, emailValido } from './kiwify.js';
+import { verifySignature, parseCompra, emailValido } from './abacatepay.js';
 import { enviarEntrega, verificarSmtp } from './mailer.js';
 import { iniciarStore, foiEntregue, registrarEntrega, totalEntregas } from './store.js';
 
@@ -8,7 +8,7 @@ const MAX_BODY = 1_000_000; // 1 MB: webhook legítimo é muito menor
 
 /**
  * Metadados do último webhook recebido. Serve para diagnosticar de fora — sem
- * acesso ao log do painel — se a Kiwify está chamando e em que formato ela
+ * acesso ao log do painel — se a AbacatePay está chamando e em que formato ela
  * assina. Guarda só o formato, nunca o conteúdo: sem e-mail, sem nome e sem a
  * assinatura inteira.
  */
@@ -49,7 +49,7 @@ function lerCorpo(req: http.IncomingMessage): Promise<Buffer> {
 }
 
 /**
- * Processa a compra depois de já ter respondido 200 à Kiwify.
+ * Processa a compra depois de já ter respondido 200 à AbacatePay.
  * Webhook que demora vira retry; a entrega em si não precisa segurar a resposta.
  */
 async function processar(rawBody: Buffer) {
@@ -70,7 +70,7 @@ async function processar(rawBody: Buffer) {
     return;
   }
 
-  if (config.kiwify.productId && compra.produtoId && compra.produtoId !== config.kiwify.productId) {
+  if (config.abacate.productId && compra.produtoId && compra.produtoId !== config.abacate.productId) {
     log('info', 'compra de outro produto, ignorada', {
       orderId: compra.orderId, produtoId: compra.produtoId,
     });
@@ -103,7 +103,7 @@ async function processar(rawBody: Buffer) {
       orderId: compra.orderId, email: compra.email, messageId, totalEntregas: totalEntregas(),
     });
   } catch (err) {
-    // Não registra como entregue: assim um retry da Kiwify tenta de novo.
+    // Não registra como entregue: assim um retry da AbacatePay tenta de novo.
     log('error', 'FALHA AO ENVIAR — comprador ficou sem o produto', {
       orderId: compra.orderId, email: compra.email, erro: (err as Error).message,
     });
@@ -121,9 +121,9 @@ const server = http.createServer(async (req, res) => {
   if (rota === '/debug/ultimo' && req.method === 'GET') {
     return json(res, 200, {
       ultimoRecebido,
-      assinaturaEstrita: config.kiwify.strictSignature,
-      tokenConfigurado: !!config.kiwify.webhookToken,
-      produtoFiltrado: config.kiwify.productId || null,
+      assinaturaEstrita: config.abacate.strictSignature,
+      secretConfigurado: !!config.abacate.webhookSecret,
+      produtoFiltrado: config.abacate.productId || null,
       smtpConfigurado: !!config.smtp.host,
       entregaConfigurada: !!config.delivery.url,
       entregas: totalEntregas(),
@@ -132,12 +132,12 @@ const server = http.createServer(async (req, res) => {
 
   if (rota === '/' && req.method === 'GET') {
     return json(res, 200, {
-      servico: 'webhook-kiwify · 300 Cards de Segurança Familiar',
-      webhook: `${config.publicUrl || ''}/webhook/kiwify`,
+      servico: 'webhook-abacatepay · 300 Cards de Segurança Familiar',
+      webhook: `${config.publicUrl || ''}/webhook/abacatepay`,
     });
   }
 
-  if (rota === '/webhook/kiwify') {
+  if (rota === '/webhook/abacatepay') {
     if (req.method !== 'POST') {
       res.writeHead(405, { Allow: 'POST' });
       return res.end();
@@ -155,37 +155,40 @@ const server = http.createServer(async (req, res) => {
 
     ultimoRecebido = {
       quando: new Date().toISOString(),
-      assinaturaValida: check.valid,
-      algoritmo: check.algorithm,
+      verificacaoOk: check.valid,
+      secretOk: check.secretOk,
+      hmacOk: check.hmacOk,
       motivo: check.reason ?? null,
       assinaturaPresente: !!check.received,
       assinaturaTamanho: check.received?.length ?? 0,
       chavesDaQuery: [...url.searchParams.keys()],
       headersRelevantes: Object.keys(req.headers).filter((h) =>
-        h.includes('kiwify') || h.includes('signature') || h.includes('hash')
+        h.includes('signature') || h.includes('webhook') || h.includes('hash')
       ),
       corpoBytes: rawBody.length,
     };
 
     if (!check.valid) {
-      // Loga o formato recebido para descobrir o esquema real da Kiwify
+      // Loga o formato recebido para descobrir o esquema real da AbacatePay
       // sem precisar aceitar requisição não autenticada.
-      log('warn', 'assinatura inválida', {
+      log('warn', 'webhook não verificado', {
         motivo: check.reason,
+        secretOk: check.secretOk,
+        hmacOk: check.hmacOk,
         assinaturaRecebida: check.received ? `${check.received.slice(0, 12)}…(${check.received.length} chars)` : null,
         queryKeys: [...url.searchParams.keys()],
-        headersKiwify: Object.keys(req.headers).filter((h) => h.includes('kiwify') || h.includes('signature')),
-        strict: config.kiwify.strictSignature,
+        headersAssinatura: Object.keys(req.headers).filter((h) => h.includes('signature') || h.includes('webhook')),
+        strict: config.abacate.strictSignature,
       });
 
-      if (config.kiwify.strictSignature) {
-        return json(res, 401, { erro: 'assinatura inválida' });
+      if (config.abacate.strictSignature) {
+        return json(res, 401, { erro: 'webhook não verificado' });
       }
     } else {
-      log('info', 'assinatura conferida', { algoritmo: check.algorithm });
+      log('info', 'webhook verificado (secret + HMAC)');
     }
 
-    // Responde já: a Kiwify não deve esperar o SMTP.
+    // Responde já: a AbacatePay não deve esperar o SMTP.
     json(res, 200, { recebido: true });
     void processar(rawBody);
     return;
@@ -201,8 +204,8 @@ server.listen(config.port, '0.0.0.0', () => {
   log('info', 'servidor no ar', {
     porta: config.port,
     urlPublica: config.publicUrl || '(não configurada)',
-    webhook: `${config.publicUrl || ''}/webhook/kiwify`,
-    assinaturaEstrita: config.kiwify.strictSignature,
+    webhook: `${config.publicUrl || ''}/webhook/abacatepay`,
+    assinaturaEstrita: config.abacate.strictSignature,
     persistencia: store.persistente,
     entregasCarregadas: store.carregadas,
   });

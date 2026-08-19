@@ -3,10 +3,10 @@ import path from 'node:path';
 import { config } from './config.js';
 
 /**
- * Idempotência. A Kiwify reenvia o webhook quando não recebe 200 — sem isso,
+ * Idempotência. A AbacatePay reenvia o webhook quando não recebe 200 — sem isso,
  * o comprador levaria o mesmo e-mail várias vezes.
  *
- * O registro autoritativo das vendas é a própria Kiwify; aqui guardamos só o
+ * O registro autoritativo das vendas é a própria AbacatePay; aqui guardamos só o
  * suficiente para não entregar duas vezes e para auditar o que saiu.
  */
 

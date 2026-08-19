@@ -28,17 +28,17 @@ export const config = {
    */
   publicUrl: opt('PUBLIC_URL', '').replace(/\/+$/, ''),
 
-  kiwify: {
-    /** Token do webhook, definido no painel da Kiwify ao criar o webhook. */
-    webhookToken: opt('KIWIFY_WEBHOOK_TOKEN'),
+  abacate: {
+    /** Secret do webhook, definido por você no painel da AbacatePay. */
+    webhookSecret: opt('ABACATEPAY_WEBHOOK_SECRET'),
     /**
-     * Quando true (padrão), rejeita requisição com assinatura inválida.
-     * Deixe false SÓ no primeiro teste, para descobrir o formato que a Kiwify
-     * envia — o serviço loga o que chegou. Volte para true logo depois.
+     * Quando true (padrão), rejeita requisição que não passe na verificação.
+     * Deixe false SÓ no primeiro teste, para ver nos logs o formato que a
+     * AbacatePay envia — o serviço registra o que chegou. Volte para true.
      */
-    strictSignature: bool('KIWIFY_STRICT_SIGNATURE', true),
-    /** Se preenchido, só processa webhooks deste produto. */
-    productId: opt('KIWIFY_PRODUCT_ID'),
+    strictSignature: bool('ABACATEPAY_STRICT_SIGNATURE', true),
+    /** Se preenchido, só processa webhooks deste produto (prod_...). */
+    productId: opt('ABACATEPAY_PRODUCT_ID'),
   },
 
   smtp: {
@@ -74,8 +74,8 @@ export function validateConfig(): string[] {
   if (!config.smtp.pass) problemas.push('SMTP_PASS não configurado');
   if (!config.smtp.fromEmail) problemas.push('MAIL_FROM_EMAIL não configurado');
   if (!config.delivery.url) problemas.push('DELIVERY_URL não configurado — o e-mail sairia sem o link do produto');
-  if (!config.kiwify.webhookToken) {
-    problemas.push('KIWIFY_WEBHOOK_TOKEN não configurado — impossível validar a assinatura do webhook');
+  if (!config.abacate.webhookSecret) {
+    problemas.push('ABACATEPAY_WEBHOOK_SECRET não configurado — impossível validar o webhook');
   }
   return problemas;
 }

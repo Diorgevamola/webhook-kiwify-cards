@@ -1,5 +1,5 @@
 import { config } from './config.js';
-import type { Compra } from './kiwify.js';
+import type { Compra } from './abacatepay.js';
 
 const esc = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

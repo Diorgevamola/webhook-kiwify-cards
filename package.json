@@ -1,9 +1,9 @@
 {
-  "name": "webhook-kiwify-cards-seguranca",
+  "name": "webhook-abacatepay-cards-seguranca",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Recebe webhook da Kiwify e entrega o produto por e-mail",
+  "description": "Recebe webhook da AbacatePay e entrega o produto por e-mail",
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc",

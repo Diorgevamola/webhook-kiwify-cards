@@ -21,7 +21,7 @@ async function main() {
       node: process.version,
       cwd: process.cwd(),
       envPresentes: Object.keys(process.env)
-        .filter((k) => /^(PORT|PUBLIC_URL|DATA_DIR|KIWIFY_|SMTP_|MAIL_|DELIVERY_|SUPPORT_|NODE_ENV)/.test(k))
+        .filter((k) => /^(PORT|PUBLIC_URL|DATA_DIR|ABACATEPAY_|SMTP_|MAIL_|DELIVERY_|SUPPORT_|NODE_ENV)/.test(k))
         .sort(),
     };
 

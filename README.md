@@ -1,36 +1,49 @@
-# Webhook Kiwify — 300 Cards de Segurança Familiar
+# Webhook AbacatePay — 300 Cards de Segurança Familiar
 
-Recebe o webhook de compra aprovada da Kiwify e entrega o produto por e-mail.
+Recebe o webhook de pagamento aprovado da AbacatePay e entrega o produto por e-mail.
 
 ```
-Kiwify (compra aprovada) → POST /webhook/kiwify → valida assinatura
-                                                → envia e-mail com o link do Drive
-                                                → registra para não enviar duas vezes
+AbacatePay (pagamento pago) → POST /webhook/abacatepay → verifica secret + HMAC
+                                                       → envia e-mail com o link do Drive
+                                                       → registra para não enviar duas vezes
 ```
 
 ## Rotas
 
 | Rota | Método | Função |
 |---|---|---|
-| `/webhook/kiwify` | POST | Endpoint a cadastrar na Kiwify |
+| `/webhook/abacatepay` | POST | Endpoint a cadastrar na AbacatePay |
 | `/health` | GET | Healthcheck e total de entregas |
+| `/debug/ultimo` | GET | Formato do último webhook recebido (sem dados pessoais) |
 | `/` | GET | Identificação do serviço |
 
 ## Decisões de projeto
 
-**Responde 200 antes de enviar o e-mail.** A Kiwify reenvia quando não recebe
+**Responde 200 antes de enviar o e-mail.** A AbacatePay reenvia quando não recebe
 resposta rápida; segurar a conexão esperando o SMTP geraria retry e e-mail
 duplicado.
 
-**Falha de envio não marca como entregue.** Assim o retry da Kiwify tenta de
+**Falha de envio não marca como entregue.** Assim o retry da AbacatePay tenta de
 novo, em vez de o comprador ficar sem o produto silenciosamente.
 
-**Assinatura aceita SHA-1 e SHA-256.** A documentação pública da Kiwify não fixa
-o algoritmo. O serviço testa os dois, registra qual bateu e rejeita o que não
-bater. Comparação em tempo constante.
+**A barreira real é o secret da URL, não a assinatura.** A AbacatePay assina o
+corpo com uma chave HMAC **pública** — a mesma para todos os integradores,
+impressa na documentação. Ela prova que o corpo não foi alterado em trânsito,
+mas qualquer pessoa consegue calculá-la, então não prova origem. Quem impede
+requisição forjada é o `webhookSecret` da query string. As duas camadas são
+exigidas juntas; o log diz qual das duas falhou.
 
 **Corpo bruto preservado.** Reserializar o JSON mudaria os bytes e quebraria a
 assinatura.
+
+**Leitura tolerante do payload.** A documentação pública não fixa o formato de
+`data` para cada evento, então o parse procura e-mail, nome e produto em vários
+caminhos plausíveis. O formato que chegou de verdade aparece em `/debug/ultimo`
+e no log do primeiro webhook real.
+
+**Só `checkout.completed` e `transparent.completed` entregam.** Reembolso e
+disputa são registrados e ignorados — a entrega é um link de Drive, que não teria
+como ser revogado sem mudar a forma de entrega.
 
 ## Variáveis de ambiente
 
@@ -38,14 +51,25 @@ Ver `.env.example`. As indispensáveis:
 
 | Variável | Para quê |
 |---|---|
-| `KIWIFY_WEBHOOK_TOKEN` | validar a assinatura (mesmo valor do painel) |
+| `ABACATEPAY_WEBHOOK_SECRET` | validar o webhook (mesmo valor cadastrado no painel) |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | envio |
 | `MAIL_FROM_EMAIL` | remetente |
 | `DELIVERY_URL` | link do Google Drive com o produto |
 | `PUBLIC_URL` | URL do serviço — **trocar aqui quando tiver domínio próprio** |
+| `ABACATEPAY_PRODUCT_ID` | opcional: só entrega compras deste produto |
 
 O serviço sobe mesmo com configuração faltando, mas registra no log exatamente
 o que falta e por quê. Confira o log após o primeiro deploy.
+
+## Cadastro no painel da AbacatePay
+
+Em **Integração → Webhook**, cadastre a URL com o secret na query string:
+
+```
+https://SEU-DOMINIO/webhook/abacatepay?webhookSecret=SEU_SECRET
+```
+
+O valor de `webhookSecret` precisa ser idêntico ao de `ABACATEPAY_WEBHOOK_SECRET`.
 
 ## Persistência
 
@@ -58,15 +82,15 @@ redeploy zera o registro e um retry antigo pode reenviar e-mail.
 ```bash
 npm install
 npm run build
-node dist/selftest.js   # 19 testes de assinatura, parse e idempotência
+node dist/selftest.js   # 24 testes de verificação, parse e idempotência
 node dist/server.js
 ```
 
 ## Primeiro webhook real
 
-Se a assinatura for rejeitada, o log mostra o formato recebido (chaves da query
-e headers) sem aceitar a requisição. Ajuste e mantenha
-`KIWIFY_STRICT_SIGNATURE=true`.
+Se a verificação falhar, o log e `/debug/ultimo` mostram o formato recebido
+(chaves da query e headers) sem aceitar a requisição. Ajuste e mantenha
+`ABACATEPAY_STRICT_SIGNATURE=true`.
 
 ## Armadilhas já encontradas neste deploy
 
