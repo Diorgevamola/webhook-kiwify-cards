@@ -12,6 +12,16 @@ function getTransporter(): Transporter {
     port: config.smtp.port,
     secure: config.smtp.secure,
     auth: { user: config.smtp.user, pass: config.smtp.pass },
+    /**
+     * Nome usado no EHLO. Sem isto o nodemailer usa o hostname do container,
+     * que em Docker vira `[127.0.0.1]`. O servidor de saída aceita (somos
+     * cliente autenticado), mas grava `helo=[127.0.0.1]` no cabeçalho
+     * `Received` que segue junto com a mensagem — e um remetente que se
+     * anuncia como localhost é sinal forte de spam. O Gmail respondia `250 OK`
+     * na fila e descartava a mensagem em silêncio, sem bounce: entrega
+     * marcada como concluída e comprador sem o produto.
+     */
+    name: config.smtp.heloName,
     pool: true,
     maxConnections: 3,
   });

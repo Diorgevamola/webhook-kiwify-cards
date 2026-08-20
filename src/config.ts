@@ -49,6 +49,12 @@ export const config = {
     pass: opt('SMTP_PASS'),
     fromName: opt('MAIL_FROM_NAME', '300 Cards de Segurança Familiar'),
     fromEmail: opt('MAIL_FROM_EMAIL'),
+    /**
+     * Nome anunciado no EHLO. Default: o domínio do remetente, que sempre
+     * resolve e combina com o envelope. Só precisa ser sobrescrito se o
+     * servidor de saída exigir um hostname específico.
+     */
+    heloName: opt('SMTP_HELO_NAME') || opt('MAIL_FROM_EMAIL').split('@')[1] || 'localhost',
     replyTo: opt('MAIL_REPLY_TO'),
     /** Cópia oculta para você acompanhar as entregas. Opcional. */
     bcc: opt('MAIL_BCC'),
