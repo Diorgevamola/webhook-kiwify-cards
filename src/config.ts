@@ -13,6 +13,16 @@ function opt(name: string, fallback = ''): string {
   return process.env[name]?.trim() || fallback;
 }
 
+/**
+ * Como `opt`, mas distingue "variável ausente" de "variável definida e vazia".
+ * Sem isso não há como DESLIGAR um texto que tem default: `opt` cairia no
+ * fallback e o rodapé de um produto vazaria no e-mail de outro.
+ */
+function optText(name: string, fallback = ''): string {
+  const v = process.env[name];
+  return v === undefined ? fallback : v.trim();
+}
+
 function bool(name: string, fallback: boolean): boolean {
   const v = process.env[name]?.trim().toLowerCase();
   if (v === undefined || v === '') return fallback;
@@ -66,6 +76,77 @@ export const config = {
     bonusUrl: opt('DELIVERY_BONUS_URL'),
     supportWhatsapp: opt('SUPPORT_WHATSAPP'),
     supportEmail: opt('SUPPORT_EMAIL'),
+  },
+
+  /**
+   * Identidade do produto no e-mail de entrega. Os defaults são os dos 300
+   * Cards de Segurança Familiar, para que a instância que já roda continue
+   * idêntica sem precisar de nenhuma variável nova. Uma segunda instância do
+   * mesmo serviço entrega outro produto só trocando estas variáveis.
+   */
+  product: {
+    name: opt('PRODUCT_NAME', '300 Cards de Segurança Familiar'),
+    subtitle: optText('PRODUCT_SUBTITLE', 'Edição Brasil'),
+    emoji: opt('PRODUCT_EMOJI', '🛡️'),
+    /** Cor do cabeçalho e do rodapé do e-mail. */
+    colorDark: opt('PRODUCT_COLOR_DARK', '#0E2F50'),
+    /** Cor do botão e dos destaques. */
+    colorAccent: opt('PRODUCT_COLOR_ACCENT', '#16A34A'),
+    subject: opt('MAIL_SUBJECT', 'Seus 300 Cards de Segurança Familiar estão prontos 🛡️'),
+    ctaLabel: opt('CTA_LABEL', 'BAIXAR MEUS 300 CARDS'),
+    /** Frase que antecede o link na versão em texto puro do e-mail. */
+    textLinkLabel: opt('MAIL_TEXT_LINK_LABEL', 'Baixe aqui o kit completo:'),
+    intro: optText(
+      'MAIL_INTRO',
+      'Obrigado pela compra. Está tudo pronto para você imprimir e começar a montar o plano de segurança da sua família.'
+    ),
+    /**
+     * Passos do "como começar", no formato `titulo::corpo` separados por `|`.
+     * Vazio omite a seção inteira.
+     */
+    steps: optText(
+      'MAIL_STEPS',
+      '1. Imprima a primeira folha.::São as cartas 001 a 009.' +
+        '|2. Recorte pelas marcas.::Nove cartas por folha.' +
+        '|3. Resolva essas nove com a família.::É o diagnóstico de risco da sua casa — em uns 20 minutos vocês já têm as primeiras decisões no papel.'
+    ),
+    /**
+     * Passos na versao em texto puro. Sao redigidos de forma diferente do HTML
+     * de proposito: sem negrito, a frase precisa se sustentar sozinha.
+     * Mesmo formato de `steps`; vazio reaproveita `steps`.
+     */
+    stepsText: optText(
+      'MAIL_STEPS_TEXT',
+      '1. Baixe o PDF e imprima a primeira folha (cartas 001 a 009).' +
+        '|2. Recorte pelas marcas — são 9 cartas por folha.' +
+        '|3. Resolva essas 9 com a família. É o diagnóstico de risco da sua casa.'
+    ),
+    tipTitle: opt('MAIL_TIP_TITLE', 'Antes de imprimir'),
+    tipBody: optText(
+      'MAIL_TIP_BODY',
+      'Use escala 100%. Marcar “ajustar à página” encolhe tudo e as marcas de corte param de bater. Papel de 180 g deixa a carta firme — sulfite comum também funciona.'
+    ),
+    /**
+     * Titulo e corpo da dica na versao em texto puro — tambem redigidos de
+     * forma propria. Vazio reaproveita `tipTitle` / `tipBody`.
+     */
+    tipTitleText: optText('MAIL_TIP_TITLE_TEXT', 'DICA DE IMPRESSÃO'),
+    tipBodyText: optText(
+      'MAIL_TIP_BODY_TEXT',
+      'Imprima em escala 100%. Se marcar "ajustar à página", as marcas de corte\n' +
+        'param de bater. Papel de 180 g deixa a carta firme, mas sulfite comum funciona.'
+    ),
+    /** Linha extra no rodapé. Vazio omite. */
+    footerNote: optText(
+      'MAIL_FOOTER_NOTE',
+      'Material educativo. Em emergência real, acione SAMU 192, Bombeiros 193 ou Polícia 190.'
+    ),
+    /** Rótulo do bônus. Só aparece se DELIVERY_BONUS_URL estiver preenchido. */
+    bonusTitle: optText('BONUS_TITLE', 'Plano Impresso Pronto'),
+    bonusText: optText(
+      'BONUS_TEXT',
+      'Índice das 300 cartas, o Plano da Família para preencher e o guia de impressão.'
+    ),
   },
 
   /** Onde guardar o registro de entregas (para idempotência). */
